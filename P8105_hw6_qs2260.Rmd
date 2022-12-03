@@ -1,0 +1,70 @@
+---
+title: "p8105_hw6"
+author: "Qingzhen Sun"
+date: "2022-12-01"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(readr)
+library(patchwork)
+library(purrr)
+```
+
+## Problem 2 
+
+#### Load the raw data, and discrible the raw data.
+```{r}
+urlfile = "https://raw.githubusercontent.com/washingtonpost/data-homicides/master/homicide-data.csv"
+homi_data = read_csv(url(urlfile))%>%
+  janitor::clean_names()
+dim(homi_data)
+```
+#### Tidy the raw data and adding new variables.
+
+```{r}
+tidy_homi = homi_data%>%
+  mutate(city_state = str_c(city, ",", state))%>%
+  mutate(situation = as.numeric(disposition == "Closed by arrest"))%>%
+  mutate(victim_age = as.numeric(victim_age))%>%
+  mutate(situation = as.numeric(situation))%>%
+  filter(victim_race == "White"| victim_race== "Black")%>%
+  filter(city_state != c("Dallas,TX", "Phoenix,AZ", "Kansas City,MO", "Tulsa,AL"))
+  
+  
+```
+
+#### Fit in the model and do analysis for city Baltimore
+
+```{r}
+homi_BD = tidy_homi%>%
+  filter(city_state == "Baltimore,MD")%>%
+  select(situation, victim_race, victim_age, victim_sex)%>%
+  glm(situation ~ victim_race + victim_sex + victim_age, data = ., family = binomial() )%>%
+  broom::tidy() %>%
+  mutate(OR = exp(estimate),
+         OR_lower = OR - qnorm(0.95)*std.error,
+         OR_upper = OR + qnorm(0.95)*std.error)%>%
+  select(OR, OR_lower, OR_upper, estimate)
+  
+  #save(file = "result/homi_BD.RData")
+  
+homi_BD
+```
+#### fit model for each cities.
+```{r}
+city_nest = tidy_homi%>%
+  select(city_state, victim_race, victim_age, victim_sex, situation)%>%
+  nest(data = -city_state)%>%
+  mutate(city_model = maps::map(.x = data, .y =glm(situation ~ victim_race + victim_sex + victim_age, data = .x, family = binomial() ) ),
+         city_result = maps::map(city_model, broom::tidy))
+
+
+  
+
+
+```
+
+
+
